@@ -1,0 +1,20 @@
+Get-AzureADApplicationPasswordCredential -ObjectId 2ecbe39e-ba78-454e-8bd8-601e390dfcf7
+
+
+$spn = Get-AzureADApplicationPasswordCredential -ObjectId 2ecbe39e-ba78-454e-8bd8-601e390dfcf7 | ForEach-Object {
+    [pscustomobject]@{
+        Keyenddate = $_.EndDate
+        Keyidvalue = $_.KeyId
+    }
+}
+$logAnalyticsParams = @{
+    CustomerId = "276019b8-9f78-4ee6-ab04-fce599ecbe1d"
+    SharedKey = "GQHeMKiO6E65BjMDKJOS9YDwXnBiEFWLLXox+f8EY0xFX7bY5ffX+nFo64x67YMbVS2xBkx6htik0qWgL1zsGQ=="
+    LogType = "SPN"
+}
+
+Export-LogAnalytics @logAnalyticsParams $spn
+
+SPN_CL
+| extend day = datetime_diff('day',Keyenddate_t,now())
+| where day < 8
