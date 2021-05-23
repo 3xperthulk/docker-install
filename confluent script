@@ -65,75 +65,31 @@ Assign Permission
 
 sudo vi /etc/kafka/server.properties
 
-broker.id=1
 broker.id.generation.enable = true
 listeners=PLAINTEXT://kafka3.inswirsvqdaebeege5iy5quzng.bx.internal.cloudapp.net:9092
 advertised.listeners=PLAINTEXT://node1.server.com:9092,node2.server.com:9092,node3.server.com:9092
 zookeeper.connect=node1.server.com:2181,node2.server.com:2181,node3.server.com:2181
-
-
-
-
-cat /etc/kafka/server.properties
 broker.id.generation.enable = true
-listeners=
-advertised. listeners = 
-security.inter.broker.protocol= SSL
-sasl.enabled.mechanisms= SCRAM-SHA-2556
-ast.mechanism. inter.broker.protocol = SCRAM-SHA-256
-ssl.keystore. location 
-ssl.keystore.password= 
-ssl.key-password = 
-ssl.truststore. location = 
-ssl.truststo re.password = 
-s.client.auth required
-ssl.endpoint.identification. algorithm =
-ssl.enabled .protocols = TLSV1.2,TLSV1.1,TLSVl
-I
-ssl.keystore. typeJK .z,TLSV1.1,TLSV1
-ssl.truststore.type = JKS
-authorazer.class.name= kaflka.security.auth. SimpleAc lAuthorizer
-super.users =User:kafkabroker
-num.network.threads = 3
-num.i0.threads = 8
-default.replication.factor = 4
-min.ins ync.replicas=2
+listeners=PLAINTEXT://kafka0.qh40m0sycajuxoh3515ijjywde.bx.internal.cloudapp.net:9092
+advertised.listeners=PLAINTEXT://kafka0.qh40m0sycajuxoh3515ijjywde.bx.internal.cloudapp.net:9092
+super.users=User:kafkabroker
+num.network.threads = 2
+num.io.threads = 8
+default.replication.factor = 1
+min.insync.replicas=1
 delete.topic.enable = true
 socket.send.buffer.bytes = 102400
 socket.receive.buffer.bytes = 102400
 socket.request.max.bytes =104857600
 log.dirs = /data/kafka/kafka_log
 num.partitions = 6
-num.recovery. threads.per.data.dir = 1
-offsets.topic.replication, factor = 1
-transaction.state.log.replication.factor = 1
-transaction.state. log. min.isr = 1
-Log.retention . hours 72
-transaction.state.log.replication.factor1
-transaction.state.log.min.isr = 1
-Log.retention.hours 72
-Log.segment.bytes 1073741824
-Log.retention.check. interval.ms = 300000
-zookeeper.connect 
-zookeeper.connection. timeout.ms 6000
-zookeeper.set.acl= true
-confluent.support.metrics.enable = false
-confluent.support.customerid = anonymous
-group.initial.rebalance.delay.ms = 0,
-metric.reporters = io.confluent.metrilcs.reporter.ConfluentMet ricsReporter
-confluent.metrics.reporter.bootst rap.servers =
-contluent.metracs.reporter.security.protocol = SSL
-confluent.metrics.reporter.ssl.truststo re. location=
-confluent.metrics.reporter.ssl.truststore.password=
-confluent.metrics.reporter. ssl.keystore. location
-confluent.metrics.reporter. ssl.keysto re . password=
-confluent.metrics.reporter.ssl.key.password=
-contluent.metrics.reporter.ssl.protocol = TLS
-confluent.metrics.reporter. ssl.enabled.protocols=TLSV1.2
-confluent.metrics. reporter . ssl.keystore. type = JKS
-inter.broker .protocol. version=2.5
-Log.message. format. version=2.5
-authorizer.class.name kafka.security.authorizer .AclAuthorizer
+num.recovery.threads.per.data.dir = 1
+offsets.topic.replication.factor = 1
+log.retention.hours = 72
+log.segment.bytes = 1073741824
+log.retention.check.interval.ms = 300000
+zookeeper.connect = kafka0.qh40m0sycajuxoh3515ijjywde.bx.internal.cloudapp.net:2181
+zookeeper.connection.timeout.ms = 6000
 
 
 CONTROL CENTER:>>>>>
