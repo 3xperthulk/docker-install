@@ -114,7 +114,7 @@ transaction.state.log.min.isr = 1
 Log.retention.hours 72
 Log.segment.bytes 1073741824
 Log.retention.check. interval.ms = 300000
-zookeeper.connect - 10.30.76.164:2181, 10.30.76.163 :2181 , 10.30 .73.28:2181,10 .30.73.29:2181, 10. 22 .
+zookeeper.connect 
 zookeeper.connection. timeout.ms 6000
 zookeeper.set.acl= true
 confluent.support.metrics.enable = false
@@ -135,10 +135,6 @@ inter.broker .protocol. version=2.5
 Log.message. format. version=2.5
 authorizer.class.name kafka.security.authorizer .AclAuthorizer
 
-
-10.10.0.45
-10.10.0.46
-10.10.0.47
 
 CONTROL CENTER:>>>>>
 
