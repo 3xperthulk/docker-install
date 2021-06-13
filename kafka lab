@@ -652,6 +652,16 @@ kafka-acls --authorizer-properties zookeeper.connect=zk-1:2181 --add --allow-pri
 https://github.com/confluentinc/schema-registry
 https://github.com/confluentinc/kafka-rest
 
+SCHEMA REGISTRY
+
+git clone https://github.com/confluentinc/training-administration-src.git
+
+ADD 
+    volumes:
+      - ./schema:/opt/app/schema/
+
+in schema REGISTRY
+
 docker-compose exec broker kafka-topics --create --topic example-topic-avro --bootstrap-server broker:9092 --replication-factor 1 --partitions 1
 
 Create Schema >>>>>>>>>
@@ -718,13 +728,25 @@ Close Consumer
 {"number": 2343437, "date": 1596490492, "shipping_address": "456 Charles St, Beverly Hills, 90209 CA, USA", "subtotal": 450.0, "shipping_cost": 10.0, "tax": 28.91, "grand_total": 488.91}
 {"number": 2343438, "date": 1596490692, "shipping_address": "456 Preston St, Brooklyn, 11212 NY, USA", "subtotal": 34.0, "shipping_cost": 2.0, "tax": 3, "grand_total": 39.00}
 
-kafka-avro-console-consumer --topic example-topic-avro --bootstrap-server broker:9092  --from-beginning
+kafka-avro-console-consumer --topic example-topic-avro --bootstrap-server kafka-1:9092  --from-beginning
+
+
+Consume
+kafka-avro-console-consumer --topic example-topic-avro --bootstrap-server kafka-1:9092 --property schema.registry.url=http://schema-registry:8081
+
+Produce
+kafka-avro-console-producer --topic example-topic-avro --bootstrap-server kafka-1:9092 --property schema.registry.url=http://schema-registry:8081 --property value.schema="$(< /opt/app/schema/order_detail.avsc)"
+
+
+{"number": 2343434, "date": 1596490462, "shipping_address": "456 Everett St, Palo Alto, 94301 CA, USA", "subtotal": 99.0, "shipping_cost": 0.0, "tax": 8.91, "grand_total": 107.91}
+{"number": 2343435, "date": 1596491687, "shipping_address": "518 Castro St, Mountain View, 94305 CA, USA", "subtotal": 25.0, "shipping_cost": 0.0, "tax": 2.91, "grand_total": 27.91}
 
 With Key>>>>>>>>
 
-kafka-avro-console-producer --topic example-topic-avro --bootstrap-server broker:9092 \
+kafka-avro-console-producer --topic example-topic-avro --bootstrap-server kafka-1:9092 \
+ --property schema.registry.url=http://schema-registry:8081 \
  --property key.schema='{"type":"string"}' \
- --property value.schema="$(< /opt/app/schema/order_details.avsc)" \
+ --property value.schema="$(< /opt/app/schema/order_detail.avsc)" \
  --property parse.key=true \
  --property key.separator=":"
  
@@ -732,10 +754,18 @@ kafka-avro-console-producer --topic example-topic-avro --bootstrap-server broker
 "256743":{"number": 2343440, "date": 1596501510, "shipping_address": "55 Music Concourse Dr, San Francisco, CA 94118, USA", "subtotal": 345.00, "shipping_cost": 10.00, "tax": 10.00, "grand_total": 365.00}
 
 
-kafka-avro-console-consumer --topic  example-topic-avro --bootstrap-server broker:9092 \
+kafka-avro-console-consumer --topic  example-topic-avro --bootstrap-server kafka-1:9092 \
+ --property schema.registry.url=http://schema-registry:8081 \
  --from-beginning \
  --property print.key=true \
  --property key.separator="-"
+docker-compose down -v
+
+Updating New Fields
+
+{"number": 2343434, "date": 1596490462, "shipping_address": "456 Everett St, Palo Alto, 94301 CA, USA", "subtotal": 99.0, "shipping_cost": 0.0, "tax": 8.91, "grand_total": 107.91, "customer_name": "Ayaan"}
+
+
 docker-compose down -v
 
 Updating New Fields
