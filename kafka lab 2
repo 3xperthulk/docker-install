@@ -1,0 +1,1072 @@
+<<<<<<<<<<<<      LAB 1    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+How to check ZK Leader Follower
+
+BROKER ZOOKEEPER VERIFY >>>
+
+zookeeper-shell node1.server.com:2181 ls /brokers/ids
+
+
+docker-compose exec tools bash
+
+Create Topic >>>>
+
+kafka-topics --bootstrap-server kafka-1:9092 --create --partitions 1 --replication-factor 1 --topic example-topic-avro
+
+
+kafka-topics --bootstrap-server kafka-1:9092 --list
+PRODUCE >>>
+
+kafka-console-producer --broker-list kafka-1:9092 --topic testing
+
+kafka-console-producer --broker-list kafka-1:9092 --topic testing --property parse.key=true --property key.separator=,
+
+1,my first record
+2,second record
+
+CONSUME >>>
+
+kafka-console-consumer --bootstrap-server kafka-1:9092 --from-beginning --topic replicated-topic 
+
+kafka-console-consumer --bootstrap-server kafka-1:9092 --from-beginning --topic testing --property print.key=true
+
+<<<<<<<<<<<<      LAB 2    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+a. Investigating the Distributed Log
+
+kafka-topics \
+--create \
+--bootstrap-server kafka-1:9092 \
+--topic replicated-topic \
+--partitions 6 \
+--replication-factor 2
+
+kafka-topics \
+--describe \
+--bootstrap-server kafka-1:9092 \
+--topic replicated-topic
+
+kafka-console-producer \
+--broker-list kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+--topic replicated-topic
+
+kafka-producer-perf-test \
+--topic replicated-topic \
+--num-records 6000 \
+--record-size 100 \
+--throughput 1000 \
+--producer-props bootstrap.servers=kafka-1:9092,kafka-2:9092,kafka-3:9092
+
+kafka-console-producer \
+--broker-list kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+--topic replicated-topic
+
+cat /var/lib/kafka/data/recovery-point-offset-checkpoint | grep replicated-topic
+
+cat /var/lib/kafka/data/replication-offset-checkpoint | grep replicated-topic
+
+docker-compose exec kafka-1 /bin/bash
+
+cat /var/lib/kafka/data/replicated-topic-0/leaderepoch-checkpoint
+
+0   >>>>>>>>>>> message format
+1   >>>>>>>>>>> no of leaders
+1 0
+2 54 >>>>>>>>>>>  epoch id with offset
+
+kafka-dump-log --print-data-log --files /var/lib/kafka/data/replicated-topic-
+0/00000000000000000000.log
+
+kafka-run-class kafka.tools.DumpLogSegments \
+--files /var/lib/kafka/data/replicated-topic-
+0/00000000000000000000.index
+
+(Set Trigger) Under Replicated and Test it with Failover
+
+zookeeper-shell zk-1:2181 get /controller
+docker-compose stop kafka-1
+docker-compose ps
+zookeeper-shell zk-1:2181 ls /brokers/ids
+docker-compose logs kafka-1 | tail
+docker-compose logs kafka-1 | grep Resigned
+
+kafka-console-producer \
+--broker-list kafka-2:9092,kafka-3:9092 \
+--topic replicated-topic
+
+docker-compose exec kafka-3 \
+cat /var/lib/kafka/data/replicated-topic-0/leader-epochcheckpoint
+
+docker-compose start kafka-1
+
+
+
+<<<<<<<<<<<<<<<<<<<<< Lab 04 Managing a Kafka Cluster >>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+a. Exploring Configuration
+
+Explore All the Configuration in Control Center
+
+
+b. Automating Kafka Configuration
+
+Ansible deployment
+
+
+c. Increasing Replication Factor
+
+kafka-topics \
+--bootstrap-server kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+--create \
+--topic test \
+--partitions 3 \
+--replication-factor 2
+
+kafka-topics \
+--bootstrap-server kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+--describe \
+--topic test
+
+cat << EOF > replicate_topic_test_plan.json
+{"version":1,
+"partitions":[
+{"topic":"test","partition":0,"replicas":[101,102,103]},
+{"topic":"test","partition":1,"replicas":[101,102,103]},
+{"topic":"test","partition":2,"replicas":[102,103.101]}]
+}
+EOF
+
+cat << EOF > replicate_topic_test_plan.json
+{"version":1,
+"partitions":[
+{"topic":"test","partition":0,"replicas":[103,102,101]},
+{"topic":"test","partition":1,"replicas":[101,103,102]},
+{"topic":"test","partition":2,"replicas":[103,102,101]}]
+}
+EOF
+
+
+cat << EOF > replicate_topic_test_plan.json
+{"version":1,
+"partitions":[
+{"topic":"test","partition":0,"replicas":[102]},
+{"topic":"test","partition":1,"replicas":[101]},
+{"topic":"test","partition":2,"replicas":[103]}]
+}
+EOF
+
+kafka-reassign-partitions \
+--zookeeper zk-1:2181,zk-2:9092,zk-3:9092 \
+--reassignment-json-file replicate_topic_test_plan.json \
+--execute
+
+d. Kafka Administrative Tools
+
+(delete)
+
+kafka-configs \
+--zookeeper zk-1:2181 \
+--alter \
+--entity-type topics \
+--entity-name replicated-topic \
+--add-config retention.ms=0
+
+(compaction)
+
+kafka-topics --create --zookeeper zk-1:2181 --topic latest-product-price --replication-factor 1 --partitions 1 --config "cleanup.policy=compact" --config "delete.retention.ms=0"  --config "segment.ms=100" --config "min.cleanable.dirty.ratio=0.01"
+
+kafka-console-producer --broker-list kafka-1:9092 --topic latest-product-price --property parse.key=true --property key.separator=:
+>p3:10$
+>p5:7$
+>p3:11$
+>p6:25$
+>p6:12$
+>p5:14$
+>p5:17$
+
+kafka-console-consumer --bootstrap-server kafka-1:9092 --topic latest-product-price --property  print.key=true --property key.separator=: --from-beginning
+p3:11$
+p6:12$
+p5:14$
+p5:17$
+
+kafka-topics --bootstrap-server kafka-1:9092 \
+--create --topic i-love-kafka \
+--partitions 5 --replication-factor 3 \
+--config min.insync.replicas=2 cleanup.policy=delete
+
+kafka-topics --bootstrap-server kafka-1:9092 \
+--create --topic i-love-kafka \
+--partitions 5 --replication-factor 3 \
+--config min.insync.replicas=2 cleanup.policy=compact
+
+kafka-topics \
+--bootstrap-server kafka-1:9092 \
+--describe \
+--topic moving
+
+(Rebalance)
+kafka-topics \
+--bootstrap-server kafka-1:9092 \
+--create \
+--topic moving \
+--replica-assignment \
+101:102,102:101,101:102,102:101,101:102,102:101
+
+kafka-producer-perf-test \
+--topic moving \
+--num-records 2000000 \
+--record-size 1000 \
+--throughput 1000000000 \
+--producer-props bootstrap.servers=kafka-1:9092,kafka-2:9092
+
+kafka-consumer-perf-test \
+--broker-list kafka-1:9092,kafka-2:9092 \
+--topic moving \
+--group test-group \
+--threads 1 \
+--show-detailed-stats \
+--timeout 1000000 \
+--reporting-interval 5000 \
+--messages 10000000
+
+
+confluent-rebalancer execute \
+--zookeeper zk-1:2181 \
+--metrics-bootstrap-server kafka-1:9092,kafka-2:9092 \
+--throttle 1000000 \
+--verbose \
+--force
+
+kafka-configs \
+--zookeeper zk-1:2181 \
+--describe \
+--entity-type brokers
+
+kafka-configs \
+--zookeeper zk-1:2181 \
+--describe \
+--entity-type topics | grep -E "throttled\.replicas=[^,]+"
+
+confluent-rebalancer status \
+--zookeeper zk-1:2181
+Partitions being rebalanced:
+Topic moving: 0,1,3,5
+
+confluent-rebalancer execute \
+--zookeeper zk-1:2181 \
+--metrics-bootstrap-server kafka-1:9092,kafka-2:9092 \
+--throttle 1000000000 \
+--verbose
+
+kafka-configs \
+--describe \
+--zookeeper zk-1:2181 \
+--entity-type brokers
+
+confluent-rebalancer status \
+--zookeeper zk-1:2181
+
+kafka-configs \
+--describe \
+--zookeeper zk-1:2181 \
+--entity-type brokers
+
+(OPEN SOURCE Rebalancer)
+
+cd ~/confluent-admin/data
+
+echo '{"topics": [{"topic": "moving"}],"version":1}' > topics-to-move.json
+
+kafka-reassign-partitions \
+--zookeeper zk-1:2181 \
+--topics-to-move-json-file topics-to-move.json \
+--broker-list "101,102,103" \
+--generate > reassignment.json
+
+cat reassignment.json
+Remove Current Partition Plan
+
+kafka-configs \
+--describe \
+--zookeeper zk-1:2181 \
+--entity-type brokers
+
+kafka-reassign-partitions \
+--zookeeper zk-1:2181 \
+--reassignment-json-file reassignment.json \
+--execute \
+--throttle 1000000
+
+kafka-configs \
+--describe \
+--zookeeper zk-1:2181 \
+--entity-type brokers
+
+kafka-reassign-partitions \
+--zookeeper zk-1:2181 \
+--reassignment-json-file reassignment.json \
+--verify
+
+kafka-topics \
+--bootstrap-server kafka-1:9092 \
+--describe \
+--topic moving
+
+kafka-reassign-partitions \
+--zookeeper zk-1:2181 \
+--reassignment-json-file reassignment.json \
+--execute \
+--throttle 1000000000
+
+kafka-configs \
+--describe \
+--zookeeper zk-1:2181 \
+--entity-type brokers
+
+kafka-reassign-partitions \
+--zookeeper zk-1:2181 \
+--reassignment-json-file reassignment.json \
+--verify
+
+kafka-configs \
+--describe \
+--zookeeper zk-1:2181 \
+--entity-type brokers
+
+
+
+(Failed Broker)
+
+docker-compose exec kafka-1 ls /var/lib/kafka/data
+
+docker-compose stop kafka-1 && \
+docker-compose rm kafka-1 && \
+docker volume rm confluent-admin_data-kafka-1
+
+docker-compose up -d
+
+docker-compose exec kafka-1 ls /var/lib/kafka/data
+
+
+<<<<<<<<<<<<<<<< Lab 05 Optimizing Kafka’ Performance  >>>>>>>>>>>>>>>>>>>
+
+kafka-topics --bootstrap-server kafka-1:9092 --create --partitions 6 --replication-factor 3 --topic testperformance
+
+a. Exploring Producer Performance
+
+kafka-producer-perf-test \
+--topic testperformance \
+--num-records 1000000 \
+--record-size 100 \
+--throughput 1000000 \
+--producer-props \
+bootstrap.servers=kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+acks=0
+
+kafka-producer-perf-test \
+--topic testperformance \
+--num-records 1000000 \
+--record-size 100 \
+--throughput 1000000 \
+--producer-props \
+bootstrap.servers=kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+acks=1
+
+kafka-producer-perf-test \
+--topic performance \
+--num-records 1000000 \
+--record-size 100 \
+--throughput 1000000 \
+--producer-props \
+bootstrap.servers=kafka-1:9092,kafka-2:9092 \
+acks=all
+
+Test with Different Batch Size and Linger MS
+
+kafka-producer-perf-test \
+--topic performance \
+--num-records 1000000 \
+--record-size 100 \
+--throughput 10000000 \
+--producer-props \
+bootstrap.servers=kafka-1:9092,kafka-2:9092,kafka-3:9092 \
+acks=all \
+batch.size=400000 \
+linger.ms=500
+
+b. Modifying Partitions and Viewing Offsets
+
+kafka-topics \
+--bootstrap-server kafka-1:9092 \
+--create \
+--topic grow-topic \
+--partitions 6 \
+--replication-factor 3
+
+kafka-console-producer \
+--broker-list kafka-1:9092,kafka-2:9092 \
+--topic grow-topic
+> KSQL
+> Streaming
+> Engine
+<Ctrl-d>
+
+kafka-console-consumer \
+--consumer-property group.id=test-consumer-group \
+--from-beginning \
+--topic grow-topic \
+--bootstrap-server kafka-1:9092,kafka-2:9092
+
+kafka-consumer-groups \
+--bootstrap-server kafka-1:9092,kafka-2:9092 \
+--group test-consumer-group \
+--describe
+
+kafka-topics \
+--bootstrap-server kafka-1:9092 \
+--alter \
+--topic grow-topic \
+--partitions 12
+
+kafka-consumer-groups \
+--bootstrap-server kafka-1:9092,kafka-2:9092 \
+--group test-consumer-group \
+--describe
+
+(Kafka-based Offset Storage)
+
+kafka-console-producer \
+--broker-list kafka-1:9092,kafka-2:9092 \
+--topic new-topic
+
+kafka-console-consumer \
+--topic __consumer_offsets \
+--bootstrap-server kafka-1:9092,kafka-2:9092 \
+--formatter \
+"kafka.coordinator.group.GroupMetadataManager $OffsetsMessageFormatter" \
+| grep performance
+
+kafka-console-consumer --topic __consumer_offsets --bootstrap-server kafka-1:9092,kafka-2:9092 --formatter "kafka.coordinator.group.GroupMetadataManager $OffsetsMessageFormatter" | grep performance
+
+kafka-console-consumer \
+--from-beginning \
+--topic new-topic \
+--group new-group \
+--bootstrap-server kafka-1:9092,kafka-2:9092
+
+c. Performance Tuning
+
+Check for the Request Latency Percentile
+Observe that most of the fetch request time is in Response remote time waiting for the
+replica.fetch.wait.max.ms timeout. When Producers are not writing records, the
+fetch request latency will go up to replica.fetch.wait.max.ms (default 500ms).
+
+kafka-topics \
+--bootstrap-server kafka-1:9092 \
+--create \
+--topic grow-topic \
+--partitions 6 \
+--replication-factor 3
+
+kafka-producer-perf-test \
+--topic grow-topic \
+--num-records 1000000 --record-size 100 --throughput 1000 \
+--producer-props bootstrap.servers=kafka-1:9092,kafka-2:9092
+
+(Tune Consumers to Decrease Broker CPU Load)
+
+kafka-topics \
+--bootstrap-server kafka-1:9092 \
+--create \
+--topic i-love-logs \
+--partitions 1 \
+--replication-factor 1
+
+NS=io.confluent.monitoring.clients.interceptor && \
+kafka-producer-perf-test \
+--topic i-love-logs \
+--num-records 10000000 \
+--record-size 100 \
+--throughput 1000 \
+--producer-props \
+bootstrap.servers=kafka-1:9092,kafka-2:9092 \
+interceptor.classes=${NS}.MonitoringProducerInterceptor
+
+kafka-consumer-perf-test \
+--broker-list kafka-1:9092,kafka-2:9092 \
+--topic i-love-logs \
+--group cg \
+--messages 10000000 \
+--threads 1 \
+--show-detailed-stats \
+--reporting-interval 5000
+
+docker-compose exec kafka-1 top -n10
+
+echo "fetch.min.bytes=100000" > data/consumer.properties
+
+kafka-consumer-perf-test \
+--broker-list kafka-1:9092,kafka-2:9092 \
+--topic i-love-logs \
+--group cg-fetch-min \
+--messages 10000000 \
+--threads 1 \
+--show-detailed-stats \
+--reporting-interval 5000 \
+--consumer.config data/consumer.properties
+
+docker-compose exec kafka-1 top -n10
+
+
+(Simulating Over Consumption)
+
+kafka-consumer-groups \
+--bootstrap-server kafka-1:9092,kafka-2:9092 \
+--group cg \
+--reset-offsets \
+--to-earliest \
+--all-topics \
+--execute
+
+PACKAGE=io.confluent.monitoring.clients.interceptor && \
+echo "interceptor.classes=${PACKAGE}.MonitoringConsumerInterceptor" \
+> data/consumer-monitor.properties
+
+kafka-console-consumer \
+--bootstrap-server kafka-1:9092 \
+--group cg \
+--consumer.config /apps/data/consumer-monitor.properties \
+--from-beginning \
+--topic i-love-logs
+
+CHeck Consumption
+
+Cluster 1 → Consumers → cg → Consumption
+
+<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<Lab 06 Kafka Security>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+a. Securing the Kafka Cluster
+
+cd ~/confluent-admin
+docker-compose down
+cd ~/confluent-admin/secure-cluster
+
+./certs-create.sh
+sudo yum install java-1.8.0-openjdk-devel -y
+
+cd ~/confluent-admin/secure-cluster
+docker-compose up -d
+
+openssl s_client -connect kafka-1:9093 -tls1
+openssl s_client -connect kafka-2:9093 -tls1
+openssl s_client -connect kafka-3:9093 -tls1
+
+kafka-topics \
+--bootstrap-server kafka-1:9092 \
+--create \
+--topic ssl-topic \
+--partitions 1 \
+--replication-factor 3
+
+kafka-console-producer \
+--broker-list kafka-1:9093,kafka-2:9093 \
+--topic ssl-topic
+
+In the code editor, create a file named producer_ssl.properties in the folder
+~/confluent-admin/secure-cluster/client-creds to configure the Kafka client
+to use the truststore. Add this content to the file:
+security.protocol=SSL
+ssl.truststore.location=client-creds/kafka.client.truststore.jks
+ssl.truststore.password=confluent
+
+cd ~/confluent-admin/secure-cluster
+kafka-console-producer \
+--broker-list kafka-1:9093,kafka-2:9093 \
+--topic ssl-topic \
+--producer.config client-creds/producer_ssl.properties
+
+Again in your code editor, create a file named consumer_ssl.properties in the folder
+~/confluent-admin/secure-cluster/client-creds to provide SSL configuration
+parameters when clients connect to the cluster. Add this content to the file:
+
+security.protocol=SSL
+ssl.truststore.location=client-creds/kafka.client.truststore.jks
+ssl.truststore.password=confluent
+
+cd ~/confluent-admin/secure-cluster
+kafka-console-consumer \
+--consumer.config client-creds/consumer_ssl.properties \
+--from-beginning \
+--topic ssl-topic \
+--bootstrap-server kafka-1:9093,kafka-2:9093
+
+(Enabling Mutual SSL Authentication)
+
+In the docker-compose.yml file in folder ~/confluent-admin/secure-cluster,
+uncomment the following environment variable for each Broker:
+KAFKA_SSL_CLIENT_AUTH: "required"
+
+cd ~/confluent-admin/secure-cluster
+docker-compose up -d
+
+kafka-console-consumer \
+--consumer.config client-creds/consumer_ssl.properties \
+--from-beginning \
+--topic ssl-topic \
+--bootstrap-server kafka-1:9093,kafka-2:9093
+
+Return to
+the ~/confluent-admin/secure-cluster/client-creds folder. With your code editor
+add the following snippet to both, the producer_ssl.properties and
+consumer_ssl.properties files:
+
+ssl.keystore.location=client-creds/kafka.client.keystore.jks
+ssl.keystore.password=confluent
+
+cd ~/confluent-admin/secure-cluster
+kafka-console-consumer \
+--consumer.config client-creds/consumer_ssl.properties \
+--from-beginning \
+--topic ssl-topic \
+--bootstrap-server kafka-1:9093,kafka-2:9093
+
+(SSL Performance Impact)
+
+• Connecting to the cluster with no SSL via the configured PLAINTEXT port (9092)
+
+kafka-topics \
+--bootstrap-server kafka-2:9092 \
+--create \
+--topic no-ssl-topic \
+--partitions 1 \
+--replication-factor 3
+
+kafka-topics \
+--bootstrap-server kafka-2:9092 \
+--create \
+--topic ssl-topic \
+--partitions 1 \
+--replication-factor 3
+
+kafka-producer-perf-test \
+--topic no-ssl-topic \
+--num-records 400000 \
+--record-size 1000 \
+--throughput 1000000 \
+--producer-props bootstrap.servers=kafka-1:9092,kafka-2:9092
+
+
+• Connecting to the cluster with SSL via the configured SSL port (9093)
+
+kafka-producer-perf-test \
+--topic ssl-topic \
+--num-records 400000 \
+--record-size 1000 \
+--throughput 1000000 \
+--producer-props bootstrap.servers=kafka-1:9093,kafka-2:9093 \
+--producer.config client-creds/producer_ssl.properties
+
+$ cd ~/confluent-admin/secure-cluster
+$ docker-compose down -v
+
+(ACLS)
+
+git clone --branch 5.3.0-v1.2.1 https://github.com/confluentinc/training-administration-src.git confluent-admin
+      KAFKA_AUTHORIZER_CLASS_NAME: kafka.security.auth.AclAuthorizer
+
+
+CN=client,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US
+
+kafka-acls --authorizer-properties zookeeper.connect=zookeeper:2181 --list
+
+kafka-acls --authorizer-properties zookeeper.connect=rest-proxy:2181 \
+   --add --allow-principal User:CN=client,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US \
+   --producer --topic testing
+ 
+kafka-acls --authorizer-properties zookeeper.connect=zk-1:2181 --add --allow-principal User:CN=client,OU=TEST,O=CONFLUENT,L=PaloAlto,ST=Ca,C=US --consumer --topic testing --group testg
+
+
+<<<<<Schema Registry and Rest Proxy>>>>>>>>>>>>>>
+
+https://github.com/confluentinc/schema-registry
+https://github.com/confluentinc/kafka-rest
+
+	--replication-factor 1 --partitions 1
+
+Create Schema >>>>>>>>>
+
+vi /schema/order_details.avsc
+{
+  "type": "record",
+  "namespace": "io.confluent.tutorial.pojo.avro",
+  "name": "OrderDetail",
+  "fields": [
+    {
+      "name": "number",
+      "type": "long",
+      "doc": "The order number."
+    },
+    {
+      "name": "date",
+      "type": "long",
+      "logicalType": "date",
+      "doc": "The date the order was submitted."
+    },
+    {
+      "name": "shipping_address",
+      "type": "string",
+      "doc": "The shipping address."
+    },
+    {
+      "name": "subtotal",
+      "type": "double",
+      "doc": "The amount without shipping cost and tax."
+    },
+    {
+      "name": "shipping_cost",
+      "type": "double",
+      "doc": "The shipping cost."
+    },
+    {
+      "name": "tax",
+      "type": "double",
+      "doc": "The applicable tax."
+    },
+    {
+      "name": "grand_total",
+      "type": "double",
+      "doc": "The order grand total ."
+    }
+  ]
+}
+
+Without Key>>>>>>>>>>>>>
+
+docker-compose exec schema-registry bash
+kafka-avro-console-consumer --topic example-topic-avro --bootstrap-server kafka-1:9092 
+docker-compose exec schema-registry bash
+
+kafka-avro-console-producer --topic example-topic-avro --bootstrap-server kafka-1:9092 --property schema.registry.url=http://schema-registry:8081 --property value.schema="$(< /opt/app/schema/order_detail.avsc)"
+
+kafka-avro-console-producer --topic example-topic-avro --bootstrap-server broker:9092 --property value.schema="{"type":"record","namespace":"io.confluent.tutorial.pojo.avro","name":"OrderDetail","fields":[{"name":"number","type":"long","doc":"The order number."},{"name":"date","type":"long","logicalType":"date","doc":"The date the order was submitted."},{"name":"shipping_address","type":"string","doc":"The shipping address."},{"name":"subtotal","type":"double","doc":"The amount without shipping cost and tax."},{"name":"shipping_cost","type":"double","doc":"The shipping cost."},{"name":"tax","type":"double","doc":"The applicable tax."},{"name":"grand_total","type":"double","doc":"The order grand total ."}]}"
+
+
+{"number": 2343434, "date": 1596490462, "shipping_address": "456 Everett St, Palo Alto, 94301 CA, USA", "subtotal": 99.0, "shipping_cost": 0.0, "tax": 8.91, "grand_total": 107.91}
+{"number": 2343435, "date": 1596491687, "shipping_address": "518 Castro St, Mountain View, 94305 CA, USA", "subtotal": 25.0, "shipping_cost": 0.0, "tax": 2.91, "grand_total": 27.91}
+
+Close Consumer
+
+{"number": 2343436, "date": 1596491687, "shipping_address": "89 Addison St, Palo Alto, 94302 CA, USA", "subtotal": 10.0, "shipping_cost": 0.0, "tax": 1, "grand_total": 11.0}
+{"number": 2343437, "date": 1596490492, "shipping_address": "456 Charles St, Beverly Hills, 90209 CA, USA", "subtotal": 450.0, "shipping_cost": 10.0, "tax": 28.91, "grand_total": 488.91}
+{"number": 2343438, "date": 1596490692, "shipping_address": "456 Preston St, Brooklyn, 11212 NY, USA", "subtotal": 34.0, "shipping_cost": 2.0, "tax": 3, "grand_total": 39.00}
+
+kafka-avro-console-consumer --topic example-topic-avro --bootstrap-server broker:9092  --from-beginning
+
+With Key>>>>>>>>
+
+kafka-avro-console-producer --topic example-topic-avro --bootstrap-server broker:9092 \
+ --property key.schema='{"type":"string"}' \
+ --property value.schema="$(< /opt/app/schema/order_details.avsc)" \
+ --property parse.key=true \
+ --property key.separator=":"
+ 
+"122345":{"number": 2343439, "date": 1596501510, "shipping_address": "1600 Pennsylvania Avenue NW, Washington, DC 20500, USA", "subtotal": 1000.0, "shipping_cost": 20.0, "tax": 0.00, "grand_total": 1020.00}
+"256743":{"number": 2343440, "date": 1596501510, "shipping_address": "55 Music Concourse Dr, San Francisco, CA 94118, USA", "subtotal": 345.00, "shipping_cost": 10.00, "tax": 10.00, "grand_total": 365.00}
+
+
+kafka-avro-console-consumer --topic  example-topic-avro --bootstrap-server broker:9092 \
+ --from-beginning \
+ --property print.key=true \
+ --property key.separator="-"
+docker-compose down -v
+
+Updating New Fields
+
+{"number": 2343434, "date": 1596490462, "shipping_address": "456 Everett St, Palo Alto, 94301 CA, USA", "subtotal": 99.0, "shipping_cost": 0.0, "tax": 8.91, "grand_total": 107.91, "customer_name": "Ayaan"}
+
+
+API >>>>>>>>>>>>..
+
+# List all subjects
+curl -X GET http://rest-proxy:8081/subjects
+
+# List all schema versions registered under the subject "Kafka-value"
+curl -X GET http://rest-proxy:8081/subjects/example-topic-avro-value/versions
+
+# Fetch a schema by globally unique id 1
+$ curl -X GET http://rest-proxy:8081/schemas/ids/1
+
+Wrong Schema
+# Test compatibility of a schema with the latest schema under subject "Kafka-value"
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+--data '{"schema": "{\"type\": \"string\"}"}' \
+http://rest-proxy:8081/compatibility/subjects/example-topic-avro-value/versions/latest
+
+Right Schema
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+--data '{"schema":"{\"type\":\"record\",\"name\":\"OrderDetail\",\"namespace\":\"io.confluent.tutorial.pojo.avro\",\"fields\":[{\"name\":\"number\",\"type\":\"long\",\"doc\":\"The order number.\"},{\"name\":\"date\",\"type\":\"long\",\"doc\":\"The date the order was submitted.\",\"logicalType\":\"date\"},{\"name\":\"shipping_address\",\"type\":\"string\",\"doc\":\"The shipping address.\"},{\"name\":\"subtotal\",\"type\":\"double\",\"doc\":\"The amount without shipping cost and tax.\"},{\"name\":\"shipping_cost\",\"type\":\"double\",\"doc\":\"The shipping cost.\"},{\"name\":\"tax\",\"type\":\"double\",\"doc\":\"The applicable tax.\"},{\"name\":\"grand_total\",\"type\":\"double\",\"doc\":\"The order grand total .\"}]}"}' \
+http://rest-proxy:8081/compatibility/subjects/example-topic-avro-value/versions/latest
+
+
+# Update compatibility requirements globally
+curl -X PUT -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+--data '{"compatibility": "NONE"}' \
+http://rest-proxy:8081/config
+
+# Update compatibility requirements under the subject "Kafka-value"
+curl -X PUT -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+--data '{"compatibility": "BACKWARD"}' \
+http://rest-proxy:8081/config/example-topic-avro-value
+
+
+curl -X PUT -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+--data '{"compatibility": "NONE"}' \
+http://rest-proxy:8081/config/example-topic-avro-value
+  
+POST NEW SCHEMA >>>>>>>>>
+
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+--data '{"schema":"{\"type\":\"record\",\"name\":\"OrderDetail\",\"namespace\":\"io.confluent.tutorial.pojo.avro\",\"fields\":[{\"name\":\"number\",\"type\":\"long\",\"doc\":\"The order number.\"},{\"name\":\"date\",\"type\":\"long\",\"doc\":\"The date the order was submitted.\",\"logicalType\":\"date\"},{\"name\":\"shipping_address\",\"type\":\"string\",\"doc\":\"The shipping address.\"},{\"name\":\"subtotal\",\"type\":\"double\",\"doc\":\"The amount without shipping cost and tax.\"},{\"name\":\"shipping_cost\",\"type\":\"double\",\"doc\":\"The shipping cost.\"},{\"name\":\"tax\",\"type\":\"double\",\"doc\":\"The applicable tax.\"},{\"name\":\"grand_total\",\"type\":\"double\",\"doc\":\"The order grand total .\"},{\"name\":\"customer_name\",\"type\":\"string\",\"doc\":\"The Customer Name.\"},{\"name\":\"customer_age\",\"type\":\"string\",\"doc\":\"The Customer Age.\"}]}"}' \
+http://rest-proxy:8081/subjects/example-topic-avro-value/versions
+
+kafka-avro-console-producer --topic example-topic-avro --bootstrap-server broker:9092 --property value.schema.id=3
+
+{"number": 2343434, "date": 1596490462, "shipping_address": "456 Everett St, Palo Alto, 94301 CA, USA", "subtotal": 99.0, "shipping_cost": 0.0, "tax": 8.91, "grand_total": 107.91, "customer_name": "Ayaan"}
+
+  
+<<<<<<<<<<<<<<REST PROXY>>>>>>>>>>>
+  
+curl --silent --output docker-compose.yml \
+  https://raw.githubusercontent.com/confluentinc/cp-all-in-one/6.1.0-post/cp-all-in-one/docker-compose.yml
+
+docker-compose up -d
+
+docker-compose exec rest-proxy bash
+
+kafka-topics --bootstrap-server broker:9092 --create --partitions 1 --replication-factor 1 --topic jsontest
+curl "http://rest-proxy:8082/topics/jsontest"
+curl -X POST -H "Content-Type: application/vnd.kafka.json.v2+json" "http://rest-proxy:8082/topics/jsontest"
+
+ # Produce a message with JSON data
+curl -X POST -H "Content-Type: application/vnd.kafka.json.v2+json" \
+--data '{"records":[{"value":{"name": "testUser"}}]}' \
+"http://rest-proxy:8082/topics/jsontest"
+
+# CReate Consumer
+
+curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" -H "Accept: application/vnd.kafka.v2+json" \
+--data '{"name": "my_consumer_instance", "format": "json", "auto.offset.reset": "earliest"}' \
+http://rest-proxy:8082/consumers/my_json_consumer
+
+http://rest-proxy:8082/consumers/my_json_consumer/instances/my_consumer_instance
+
+
+# Subscribe the consumer to a topic
+    
+curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" --data '{"topics":["jsontest"]}' \
+http://rest-proxy:8082/consumers/my_json_consumer/instances/my_consumer_instance/subscription
+
+# Then consume some data from a topic using the base URL in the first response.
+
+curl -X GET -H "Accept: application/vnd.kafka.json.v2+json" http://rest-proxy:8082/consumers/my_json_consumer/instances/my_consumer_instance/records
+
+# Delete Consumer
+
+curl -X DELETE -H "Accept: application/vnd.kafka.v2+json" \
+http://rest-proxy:8082/consumers/my_json_consumer/instances/my_consumer_instance
+
+
+curl -X POST -H "Content-Type: application/vnd.kafka.avro.v2+json" \
+--data '{"value_schema": "{\"type\": \"record\", \"name\": \"User\", \"fields\": [{\"name\": \"name\", \"type\": \"string\"}]}", "records": [{"value": {"name": "testUser"}}]}' \
+"http://rest-proxy:8082/topics/avrotest"
+  
+curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" -H "Accept: application/vnd.kafka.v2+json" \
+--data '{"name": "my_consumer_instance", "format": "avro", "auto.offset.reset": "earliest"}' \
+http://rest-proxy:8082/consumers/my_avro_consumer
+
+curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" --data '{"topics":["avrotest"]}' \
+http://rest-proxy:8082/consumers/my_avro_consumer/instances/my_consumer_instance/subscription
+ 
+curl -X GET -H "Accept: application/vnd.kafka.avro.v1+json" \
+http://rest-proxy:8082/consumers/my_avro_consumer/instances/my_consumer_instance/records
+
+
+Avro Data>>>>>>>>>>>>>>>>
+curl -X POST -H "Content-Type: application/vnd.kafka.avro.v2+json" \
+      -H "Accept: application/vnd.kafka.v2+json" \
+      --data '{"value_schema": "{\"type\": \"record\", \"name\": \"User\", \"fields\": [{\"name\": \"name\", \"type\": \"string\"}]}", "records": [{"value": {"name": "testUser"}}]}' \
+      "http://rest-proxy:8082/topics/avrotest"
+
+# Expected output from preceding command:
+  {"offsets":[{"partition":0,"offset":0,"error_code":null,"error":null}],"key_schema_id":null,"value_schema_id":21}
+
+# Produce a message with Avro key and value.
+# Note that if you use Avro values you must also use Avro keys, but the schemas can differ
+
+curl -X POST -H "Content-Type: application/vnd.kafka.avro.v2+json" \
+      -H "Accept: application/vnd.kafka.v2+json" \
+      --data '{"key_schema": "{\"name\":\"user_id\"  ,\"type\": \"int\"   }", "value_schema": "{\"type\": \"record\", \"name\": \"User\", \"fields\": [{\"name\": \"name\", \"type\": \"string\"}]}", "records": [{"key" : 1 , "value": {"name": "testUser"}}]}' \
+      "http://rest-proxy:8082/topics/avrokeytest2"
+
+# Expected output from preceding command:
+  {"offsets":[{"partition":0,"offset":0,"error_code":null,"error":null}],"key_schema_id":2,"value_schema_id":1}
+
+# Create a consumer for Avro data, starting at the beginning of the topic's
+# log and subscribe to a topic. Then consume some data from a topic, which is decoded, translated to
+# JSON, and included in the response. The schema used for deserialization is
+# fetched automatically from schema registry. Finally, clean up.
+curl -X POST  -H "Content-Type: application/vnd.kafka.v2+json" \
+      --data '{"name": "my_consumer_instance", "format": "avro", "auto.offset.reset": "earliest"}' \
+      http://rest-proxy:8082/consumers/my_avro_consumer
+
+# Expected output from preceding command:
+  {"instance_id":"my_consumer_instance","base_uri":"http://rest-proxy:8082/consumers/my_avro_consumer/instances/my_consumer_instance"}
+
+curl -X POST -H "Content-Type: application/vnd.kafka.v2+json" --data '{"topics":["avrotest"]}' \
+      http://rest-proxy:8082/consumers/my_avro_consumer/instances/my_consumer_instance/subscription
+# No content in response
+
+curl -X GET -H "Accept: application/vnd.kafka.avro.v2+json" \
+      http://rest-proxy:8082/consumers/my_avro_consumer/instances/my_consumer_instance/records
+	  
+	  
+	  
+
+<<<<<<<<<<<<<<<<<<<<,,Lab 07 Data Pipelines with Kafka Connect>>>>>>>>>>>>>>>>
+
+a. Running Kafka Connect
+
+SQL lite
+
+cd ~/confluent-admin
+sqlite3 data/my.db
+
+FOr Exit
+.exit
+
+create table years(id INTEGER PRIMARY KEY AUTOINCREMENT, name
+VARCHAR(50), year INTEGER);
+insert into years(name,year) values('Hamlet',1600);
+insert into years(name,year) values('Julius Caesar',1599);
+insert into years(name,year) values('Macbeth',1605);
+insert into years(name,year) values('Merchant of Venice',1595);
+insert into years(name,year) values('Othello',1604);
+insert into years(name,year) values('Romeo and Juliette',1594);
+insert into years(name,year) values('Anthony and Cleopatra',1606);
+insert into years(name,year) values('Ayesha and Pune',1606);
+insert into years(name,year) values('Sagar and Mumbai',1606);
+insert into years(name,year) values('Amit and Bangalore',1606);
+
+
+sqlite> SELECT * FROM years;
+
+kafka-topics \
+--bootstrap-server kafka-1:9092 \
+--create \
+--topic shakespeare_years \
+--partitions 1 \
+--replication-factor 1
+
+Configuring the Source Connector using Web UI
+
+1. Add a new source connector to read data from the database my.db and write to the
+Kafka Topic shakespeare_years by using the Connect REST API:
+a. Open Control Center at http://rest-proxy:9021:
+b. In the left sidebar, select Cluster 1
+c. In the sidebar click Connect
+d. In the view All Connect Clusters select the (only available) entry connect-default
+e. Click Add connector
+f. In the Browse overview select the JdbcSourceConnector Source tile
+g. Configure the JDBC Source Connector
+i. In the Name text box, type JDBC-Source-Connector
+ii. In the Database section, in the JDBC URL text box, type
+jdbc:sqlite:data/my.db
+iii. In the Database section, in the Table Whitelist dropdown, enter years
+iv. Under section Mode, in the Table Loading Mode text box, type incrementing
+v. Under section Mode, in the Incrementing Column Name text box, type id
+vi. Under section Connector, in the Topic Prefix text box, type shakespeare_
+h. Click Continue
+
+
+USING REST API
+
+curl -s -X POST \
+-H "Content-Type: application/json" \
+--data '{
+"name": "JDBC-Source-Connector-Rest",
+"config": {
+"connector.class":
+"io.confluent.connect.jdbc.JdbcSourceConnector",
+"connection.url": "jdbc:sqlite:data/my.db",
+"table.whitelist": "years",
+"mode": "incrementing",
+"incrementing.column.name": "id",
+"table.types": "TABLE",
+"topic.prefix": "shakespeare_"
+}
+}' http://connect:8083/connectors
+
+kafka-avro-console-consumer \
+--bootstrap-server kafka-1:9092, kafka-2:9092 \
+--property schema.registry.url=http://schema-registry:8081 \
+--from-beginning \
+--topic shakespeare_years
+
+
+Sink Connector
+
+curl -s -X POST \
+-H "Content-Type: application/json" \
+--data '{
+"name": "File-Sink-Connector",
+"config": {
+"topics": "shakespeare_years",
+"connector.class":
+"org.apache.kafka.connect.file.FileStreamSinkConnector",
+"value.converter":
+"io.confluent.connect.avro.AvroConverter",
+"value.converter.schema.registry.url":
+"http://schema-registry:8081",
+"file": "data/test.sink.txt"
+}
+}' http://connect:8083/connectors
+
+
+cat ~/confluent-admin/data/test.sink.txt
+
+sqlite3 data/my.db
+INSERT INTO years(name,year) VALUES('Tempest',1611);
+INSERT INTO years(name,year) VALUES('King Lear',1605);
+
+
+<<<<<<<<<<<<<PROMETHEUS GRAFANA>>>>>>>>>>>>>>>>>>>>>
+
+https://github.com/jeanlouisboudart/kafka-platform-prometheus
+git clone https://github.com/jeanlouisboudart/kafka-platform-prometheus.git
+cd kafka-platform-prometheus
+
+sudo yum install -y yum-utils git
+sudo yum-config-manager     --add-repo     https://download.docker.com/linux/centos/docker-ce.repo
+sudo yum install docker-ce docker-ce-cli containerd.io -y
+sudo yum install java-1.8.0-openjdk.x86_64 -y
+sudo groupadd docker
+sudo usermod -aG docker azureuser
+sudo systemctl start docker
+sudo docker run hello-world
+sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+docker-compose ps
+sudo docker-compose --version
+
+Public IP in Security Group
+
+http://40.87.105.23:9999/ Prometheus
+http://40.87.105.23:3000/ Grafana
+
+git clone --branch 5.3.0-v1.2.1 https://github.com/confluentinc/training-administration-src.git confluent-admin
+
+uyksokpmfxgshynikk@niwghx.com
+
