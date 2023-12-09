@@ -999,7 +999,7 @@ curl -s -X POST \
 "config": {
 "connector.class":
 "io.confluent.connect.jdbc.JdbcSourceConnector",
-"connection.url": "jdbc:sqlite:data/my.db",
+"connection.url": "jdbc:sqlite:/data/my.db",
 "table.whitelist": "years",
 "mode": "incrementing",
 "incrementing.column.name": "id",
